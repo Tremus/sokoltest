@@ -86,9 +86,10 @@
 //
 // **************************************************************** //
 
-// NOTE (Tre Dudman): Sensible defaults for windows & mac
+// NOTE (Tremus): Sensible defaults for windows & mac
 #ifdef _WIN32
 #define __WINDOWS_MM__
+#pragma comment(lib,"winmm.lib")
 #elif defined(__APPLE__)
 #define __MACOSX_CORE__
 #endif

@@ -7,11 +7,11 @@ set(CMAKE_C_STANDARD 99)
 # RtMidi examples
 add_executable(midiprobe src/rtmidi/midiprobe.cpp src/rtmidi/RtMidi.cpp)
 target_include_directories(midiprobe PRIVATE src/rtmidi/)
-add_executable(qmidiin src/rtmidi/qmidiin.cpp src/rtmidi/RtMidi.cpp)
+add_executable(qmidiin src/rtmidi/qmidiin.c src/rtmidi/rtmidi_c.cpp src/rtmidi/RtMidi.cpp)
 target_include_directories(qmidiin PRIVATE src/rtmidi/)
 
 set(MIDI_LIBS "")
-if (WIN32)
+if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list(APPEND MIDI_LIBS "-lwinmm")
 elseif(APPLE)
     target_link_libraries(APPEND MIDI_LIBS "-framework CoreMIDI -framework CoreAudio -framework CoreFoundation")
@@ -37,7 +37,7 @@ function(create_app NAME)
         add_executable(${NAME} MACOSX_BUNDLE ${XBUNDLE_SOURCES})
         target_link_libraries(${NAME} PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit -framework AudioToolbox")
         target_include_directories(${NAME} PRIVATE src)
-        set_target_properties(sokolnuklear PROPERTIES
+        set_target_properties(${NAME} PROPERTIES
             BUNDLE True
             MACOSX_BUNDLE_GUI_IDENTIFIER com.${NAME}.test
             MACOSX_BUNDLE_BUNDLE_NAME com.${NAME}.test

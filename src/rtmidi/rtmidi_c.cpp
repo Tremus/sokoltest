@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "rtmidi_c.h"
-#include "RtMidi.h"
+#include "RtMidi.hpp"
 
 /* Compile-time assertions that will break if the enums are changed in
  * the future without synchronizing them properly.  If you get (g++)
