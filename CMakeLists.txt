@@ -3,11 +3,6 @@ project(sokoltest)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# NOTE: sokol uses global variables
-# Forcing the app to be single insance is recommended
-# For Windows its a little hacky, but simple enough
-# https://stackoverflow.com/questions/8799646/preventing-multiple-instances-of-my-application
-
 set(PLATFORM_SOURCES "")
 if(APPLE)
     enable_language(OBJC)
@@ -36,23 +31,22 @@ function(create_app NAME)
         file(TOUCH_NOCREATE ${CMAKE_BINARY_DIR}/${NAME}.app/Contents/PkgInfo)
         file(WRITE ${CMAKE_BINARY_DIR}/${NAME}.app/Contents/PkgInfo "APPL????")
     elseif(WIN32)
+        # so elegant
         add_executable(${NAME} ${XBUNDLE_SOURCES})
     endif()
 endfunction()
 
-# (MacOS)
-# cold build time range 671-780ms, median: 680ms
-# bundle size 486kb (Release, ARM)
+# Debug cold build time: range 671-780ms, median: 680ms (MacBook Air M1)
+# Release bundle size: 486kb (MacOS ARM), 402kb (Windows x86)
 create_app(sokolnuklear
     SOURCES
         src/nuklear-sapp.c
-        src/nuklear/nuklear.c
         ${PLATFORM_SOURCES}
+        src/nuklear/nuklear.c
 )
 
-# (MacOS)
-# cold build time range 950-1050ms, median: 1s
-# bundle size 1340kb (Release, ARM)
+# Debug cold build time: range 950-1050ms, median: 1s (MacBook Air M1)
+# Release bundle size: 1340kb (MacOS ARM), 1238kb (Windows x86)
 create_app(sokolcimgui
     SOURCES
         src/cimgui-sapp.c
