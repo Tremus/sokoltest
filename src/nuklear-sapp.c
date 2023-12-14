@@ -35,6 +35,8 @@
 
 static int draw_demo_ui(struct nk_context* ctx);
 
+enum {AUDIO_OFF, AUDIO_ON};
+static int gAudioBypass;
 // -60-0dB
 static float gGaindB;
 // normalised logarithmic range 20Hz-20kHz
@@ -49,6 +51,9 @@ static inline float db_to_gain(float db) { return pow(10, db / 20); }
 
 static void audio_cb(float* buffer, int num_frames, int num_channels) {
     assert(1 == num_channels);
+
+    if (gAudioBypass == AUDIO_OFF)
+        return;
 
     float sample_rate = (float)saudio_sample_rate();
 
@@ -71,6 +76,7 @@ static void audio_cb(float* buffer, int num_frames, int num_channels) {
 
 void init(void) {
     // initialise audio state
+    gAudioBypass = AUDIO_OFF;
     gGaindB = -12.0f;
     gFrequencyNormalised = normalise_hz(500.0f);
     gPhase = 0.0f;
@@ -154,20 +160,10 @@ struct sapp_desc create_sapp_desc()
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
 
-#include <stdio.h> // fprintf, sprintf
-#include <math.h>  // sin, cos, fabs
-#include <time.h>
-#include <limits.h>
-
 static int
 draw_demo_ui(struct nk_context *ctx)
 {
-    enum {EASY, HARD};
-    static int op = EASY;
-    static float value = 0.6f;
-    static int i =  20;
-
-    if (nk_begin(ctx, "Show", nk_rect(50, 50, 220, 220),
+    if (nk_begin(ctx, "Show", nk_rect(50, 50, 300, 220),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) {
         /* fixed widget pixel width */
         nk_layout_row_static(ctx, 30, 80, 1);
@@ -177,16 +173,25 @@ draw_demo_ui(struct nk_context *ctx)
 
         /* fixed widget window ratio width */
         nk_layout_row_dynamic(ctx, 30, 2);
-        if (nk_option_label(ctx, "easy", op == EASY)) op = EASY;
-        if (nk_option_label(ctx, "hard", op == HARD)) op = HARD;
+        if (nk_option_label(ctx, "Audio Off", gAudioBypass == AUDIO_OFF)) gAudioBypass = AUDIO_OFF;
+        if (nk_option_label(ctx, "Audio On",  gAudioBypass == AUDIO_ON))  gAudioBypass = AUDIO_ON;
 
         /* custom widget pixel width */
         nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
         {
-            nk_layout_row_push(ctx, 50);
+            nk_layout_row_push(ctx, 60);
             nk_label(ctx, "Volume:", NK_TEXT_LEFT);
-            nk_layout_row_push(ctx, 110);
-            nk_slider_float(ctx, 0, &value, 1.0f, 0.1f);
+            nk_layout_row_push(ctx, 200);
+            nk_slider_float(ctx, -60, &gGaindB, 0.0f, 0.00000001f);
+        }
+        nk_layout_row_end(ctx);
+
+        nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
+        {
+            nk_layout_row_push(ctx, 60);
+            nk_label(ctx, "Frequency:", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 200);
+            nk_slider_float(ctx, 0, &gFrequencyNormalised, 1.0f, 0.00000001f);
         }
         nk_layout_row_end(ctx);
     }
