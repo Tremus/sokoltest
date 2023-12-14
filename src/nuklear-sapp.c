@@ -16,6 +16,7 @@
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_log.h"
+#include "sokol_audio.h"
 #include "sokol_glue.h"
 
 // include nuklear.h before the sokol_nuklear.h implementation
@@ -30,9 +31,50 @@
 #define SOKOL_NUKLEAR_IMPL
 #include "sokol_nuklear.h"
 
+#include <math.h>
+
 static int draw_demo_ui(struct nk_context* ctx);
 
+// -60-0dB
+static float gGaindB;
+// normalised logarithmic range 20Hz-20kHz
+static float gFrequencyNormalised;
+// oscillator phase, 0-1
+static float gPhase;
+
+static inline float denormalise_hz(float n) { return 20 * exp2f(n * 10); }
+static inline float normalise_hz(float Hz) { return logf(Hz * 0.05) * 0.14426950408889633f; }
+static inline float gain_to_db(float g) { return log10f(g) * 20; }
+static inline float db_to_gain(float db) { return pow(10, db / 20); }
+
+static void audio_cb(float* buffer, int num_frames, int num_channels) {
+    assert(1 == num_channels);
+
+    float sample_rate = (float)saudio_sample_rate();
+
+    float phase = gPhase;
+    float freq = denormalise_hz(gFrequencyNormalised);
+    float vol = db_to_gain(gGaindB);
+
+    float inc = freq / (float)sample_rate;
+
+    static uint32_t count = 0;
+    for (int i = 0; i < num_frames; i++) {
+        buffer[i] = vol * sinf(phase * 2 * 3.14159265f);
+        phase += inc;
+        phase -= (int)phase;
+    }
+
+    gPhase = phase;
+}
+
+
 void init(void) {
+    // initialise audio state
+    gGaindB = -12.0f;
+    gFrequencyNormalised = normalise_hz(500.0f);
+    gPhase = 0.0f;
+
     // setup sokol-gfx, sokol-time and sokol-nuklear
     sg_setup(&(sg_desc){
         .context = sapp_sgcontext(),
@@ -44,6 +86,12 @@ void init(void) {
     // multi-sampled rendering or using non-default pixel formats)
     snk_setup(&(snk_desc_t){
         .dpi_scale = sapp_dpi_scale(),
+        .logger.func = slog_func,
+    });
+
+    // init sokol-audio with default params
+    saudio_setup(&(saudio_desc){
+        .stream_cb = audio_cb,
         .logger.func = slog_func,
     });
 }
@@ -68,6 +116,8 @@ void frame(void) {
 }
 
 void cleanup(void) {
+    // shutdown sokol-audio
+    saudio_shutdown();
     // __dbgui_shutdown();
     snk_shutdown();
     sg_shutdown();
