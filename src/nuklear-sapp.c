@@ -163,7 +163,7 @@ struct sapp_desc create_sapp_desc()
 static int
 draw_demo_ui(struct nk_context *ctx)
 {
-    if (nk_begin(ctx, "Show", nk_rect(50, 50, 300, 220),
+    if (nk_begin(ctx, "Show", nk_rect(50, 50, 380, 220),
         NK_WINDOW_BORDER|NK_WINDOW_MOVABLE|NK_WINDOW_CLOSABLE)) {
         /* fixed widget pixel width */
         nk_layout_row_static(ctx, 30, 80, 1);
@@ -177,21 +177,36 @@ draw_demo_ui(struct nk_context *ctx)
         if (nk_option_label(ctx, "Audio On",  gAudioBypass == AUDIO_ON))  gAudioBypass = AUDIO_ON;
 
         /* custom widget pixel width */
-        nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
+        nk_layout_row_begin(ctx, NK_STATIC, 30, 3);
         {
-            nk_layout_row_push(ctx, 60);
+            nk_layout_row_push(ctx, 70);
             nk_label(ctx, "Volume:", NK_TEXT_LEFT);
             nk_layout_row_push(ctx, 200);
             nk_slider_float(ctx, -60, &gGaindB, 0.0f, 0.00000001f);
+
+            char text[16];
+            snprintf(text, sizeof(text), "%.2fdB", gGaindB);
+             nk_layout_row_push(ctx, 70);
+            nk_label(ctx, text, NK_TEXT_LEFT);
         }
         nk_layout_row_end(ctx);
 
-        nk_layout_row_begin(ctx, NK_STATIC, 30, 2);
+        nk_layout_row_begin(ctx, NK_STATIC, 30, 3);
         {
-            nk_layout_row_push(ctx, 60);
+            nk_layout_row_push(ctx, 70);
             nk_label(ctx, "Frequency:", NK_TEXT_LEFT);
+            
             nk_layout_row_push(ctx, 200);
             nk_slider_float(ctx, 0, &gFrequencyNormalised, 1.0f, 0.00000001f);
+            
+            float freq = gFrequencyNormalised;
+            freq = denormalise_hz(freq);
+            if (freq > 20000.0f)
+                freq = 20000.0f;
+            char text[16];
+            snprintf(text, sizeof(text), "%.2fHz", freq);
+            nk_layout_row_push(ctx, 70);
+            nk_label(ctx, text, NK_TEXT_LEFT);
         }
         nk_layout_row_end(ctx);
     }
