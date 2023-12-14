@@ -18,7 +18,7 @@ function(create_app NAME)
     cmake_parse_arguments(XBUNDLE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
     if (APPLE)
         add_executable(${NAME} MACOSX_BUNDLE ${XBUNDLE_SOURCES})
-        target_link_libraries(${NAME} PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit")
+        target_link_libraries(${NAME} PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit -framework AudioToolbox")
         target_include_directories(${NAME} PRIVATE src)
         set_target_properties(sokolnuklear PROPERTIES
             BUNDLE True
