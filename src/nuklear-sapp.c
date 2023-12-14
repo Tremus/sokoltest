@@ -6,14 +6,13 @@
 //
 //  Nuklear UI on github: https://github.com/Immediate-Mode-UI/Nuklear
 //------------------------------------------------------------------------------
+#include "common.h"
+
 // this is needed for the Nuklear example code further down
 #define _CRT_SECURE_NO_WARNINGS (1)
 
-#define SOKOL_IMPL
-#ifdef __APPLE__
-#define SOKOL_METAL
-#endif
-
+#define SOKOL_LOG_IMPL
+#define SOKOL_GLUE_IMPL
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_log.h"
@@ -27,7 +26,7 @@
 #define NK_INCLUDE_FONT_BAKING
 #define NK_INCLUDE_DEFAULT_FONT
 #define NK_INCLUDE_STANDARD_VARARGS
-#include "nuklear/nuklear.c"
+#include "nuklear/nuklear.h"
 #define SOKOL_NUKLEAR_IMPL
 #include "sokol_nuklear.h"
 

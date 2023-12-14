@@ -12,13 +12,21 @@ set(CMAKE_CXX_STANDARD 17)
 
 enable_language(OBJC)
 
-add_executable(nuklear_test src/nuklear-sapp.m)
+# cold build time range 671-780ms, median: 680ms
+add_executable(nuklear_test
+    src/nuklear-sapp.c
+    src/nuklear/nuklear.c
+    src/sokol_app.m
+    src/sokol_gfx.m
+    )
 target_link_libraries(nuklear_test PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit")
 target_include_directories(nuklear_test PRIVATE src)
 
-# builds faster by about 200ms
+# cold build time range 950-1050ms, median: 1s
 add_executable(cimgui_test
-    src/cimgui-sapp.m
+    src/cimgui-sapp.c
+    src/sokol_app.m
+    src/sokol_gfx.m
     src/cimgui/cimgui.cpp
     src/cimgui/imgui/imgui.cpp
     src/cimgui/imgui/imgui_demo.cpp

@@ -4,13 +4,12 @@
 //  Demonstrates Dear ImGui UI rendering in C via
 //  sokol_gfx.h + sokol_imgui.h + cimgui.h
 //------------------------------------------------------------------------------
-#ifdef __APPLE__
-#define SOKOL_METAL
-#endif
-#define SOKOL_IMPL
+#include "common.h"
 #include "sokol_app.h"
 #include "sokol_gfx.h"
+#define SOKOL_LOG_IMPL
 #include "sokol_log.h"
+#define SOKOL_GLUE_IMPL
 #include "sokol_glue.h"
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui/cimgui.h"
