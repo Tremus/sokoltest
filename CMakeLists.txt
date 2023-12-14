@@ -4,6 +4,22 @@ project(sokoltest)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 99)
 
+# RtMidi examples
+add_executable(midiprobe src/rtmidi/midiprobe.cpp src/rtmidi/RtMidi.cpp)
+target_include_directories(midiprobe PRIVATE src/rtmidi/)
+
+if (WIN32)
+    target_compile_definitions(midiprobe PRIVATE __WINDOWS_MM__)
+    target_link_libraries(midiprobe PRIVATE -lwinmm)
+endif()
+
+add_executable(qmidiin src/rtmidi/qmidiin.cpp src/rtmidi/RtMidi.cpp)
+target_include_directories(qmidiin PRIVATE src/rtmidi/)
+if (WIN32)
+    target_compile_definitions(qmidiin PRIVATE __WINDOWS_MM__)
+    target_link_libraries(qmidiin PRIVATE -lwinmm)
+endif()
+
 set(PLATFORM_SOURCES "")
 if(APPLE)
     enable_language(OBJC)
