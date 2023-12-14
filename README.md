@@ -1,0 +1,1 @@
+Me playing around with boilerplate code for cross platform, single instance, standalone apps.
