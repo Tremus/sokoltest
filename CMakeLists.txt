@@ -5,25 +5,46 @@ set(CMAKE_CXX_STANDARD 17)
 
 # NOTE: sokol uses global variables
 # Forcing the app to be single insance is recommended
-# On macos, set the LSMultipleInstancesProhibited
-# field in the info.plist
 # For Windows its a little hacky, but simple enough
 # https://stackoverflow.com/questions/8799646/preventing-multiple-instances-of-my-application
 
 enable_language(OBJC)
 
-# cold build time range 671-780ms, median: 680ms
-add_executable(nuklear_test
-    src/nuklear-sapp.c
-    src/nuklear/nuklear.c
-    src/sokol_app.m
-    src/sokol_gfx.m
+function(create_bundle NAME)
+    set(options OPTIONAL)
+    set(oneValueArgs ONEVALUE)
+    set(multiValueArgs SOURCES)
+    cmake_parse_arguments(XBUNDLE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN} )
+    add_executable(${NAME} MACOSX_BUNDLE ${XBUNDLE_SOURCES})
+    target_link_libraries(${NAME} PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit")
+    target_include_directories(${NAME} PRIVATE src)
+    set_target_properties(sokolnuklear PROPERTIES
+        BUNDLE True
+        MACOSX_BUNDLE_GUI_IDENTIFIER com.${NAME}.test
+        MACOSX_BUNDLE_BUNDLE_NAME com.${NAME}.test
+        MACOSX_BUNDLE_BUNDLE_VERSION ${VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${VERSION}
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/bundle.plist
     )
-target_link_libraries(nuklear_test PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit")
-target_include_directories(nuklear_test PRIVATE src)
+    file(TOUCH_NOCREATE ${CMAKE_BINARY_DIR}/${NAME}.app/Contents/PkgInfo)
+    file(WRITE ${CMAKE_BINARY_DIR}/${NAME}.app/Contents/PkgInfo "APPL????")
+endfunction()
 
+# (MacOS)
+# cold build time range 671-780ms, median: 680ms
+# bundle size 486kb (Release, ARM)
+create_bundle(sokolnuklear
+    SOURCES
+        src/nuklear-sapp.c
+        src/nuklear/nuklear.c
+        src/sokol_app.m
+        src/sokol_gfx.m
+)
+
+# (MacOS)
 # cold build time range 950-1050ms, median: 1s
-add_executable(cimgui_test
+# bundle size 1340kb (Release, ARM)
+create_bundle(sokolcimgui SOURCES
     src/cimgui-sapp.c
     src/sokol_app.m
     src/sokol_gfx.m
@@ -34,5 +55,3 @@ add_executable(cimgui_test
     src/cimgui/imgui/imgui_tables.cpp
     src/cimgui/imgui/imgui_widgets.cpp
     )
-target_link_libraries(cimgui_test PRIVATE "-framework Cocoa -framework QuartzCore -framework Metal -framework MetalKit")
-target_include_directories(cimgui_test PRIVATE src)
