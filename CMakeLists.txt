@@ -59,7 +59,10 @@ create_app(sokolnuklear
     SOURCES
         src/nuklear-sapp.c
         ${PLATFORM_SOURCES}
+        src/thread.c
         src/nuklear/nuklear.c
+        src/rtmidi/rtmidi_c.cpp
+        src/rtmidi/RtMidi.cpp
 )
 
 # Debug cold build time: range 950-1050ms, median: 1s (MacBook Air M1)
