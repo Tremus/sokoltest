@@ -53,6 +53,11 @@ function(create_app NAME)
     endif()
 endfunction()
 
+# Note the stats below were calculated before I added sokol_audio.h and RtMidi
+# to this project, which have increased compile time & binary size.
+# The original code was from boilerplate code found here:
+# https://github.com/floooh/sokol-samples
+
 # Debug cold build time: range 671-780ms, median: 680ms (MacBook Air M1)
 # Release bundle size: 486kb (MacOS ARM), 402kb (Windows x86)
 create_app(sokolnuklear
