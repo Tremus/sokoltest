@@ -6,59 +6,83 @@
 #include "rtmidi_c.h"
 
 #ifdef _WIN32
-void Sleep(unsigned long ms);
+extern void Sleep(unsigned long ms);
 #define SLEEP(ms) Sleep(ms)
 #else
 #include <unistd.h>
 #define SLEEP(ms) usleep(ms * 1000)
 #endif
- 
-bool done;
+
+enum MidiEventType {
+    MIDI_NOTE_OFF         = 0x80,
+    MIDI_NOTE_ON          = 0x90,
+};
+
+bool done = false;
 static void finish(int ignore){ done = true; }
 
-int main()
-{
+int main() {
     unsigned char messages[1024];
     size_t nBytes;
     struct RtMidiWrapper *midiin;
     float stamp;
     int i;
-    if ((midiin = rtmidi_in_create_default())) {
-        unsigned int nPorts;
-        int portNameLen; 
-        char portName[128];
+    unsigned int nPorts;
+    int portNameLen; 
+    char portName[128];
 
-        // Check available ports.
-        nPorts = rtmidi_get_port_count(midiin);
-        if ( nPorts == 0 ) {
-            printf("No ports available!\n");
-            goto cleanup;
-        }
-        rtmidi_get_port_name(midiin, 0, portName, &portNameLen);
-        rtmidi_open_port(midiin, 0, "RtMidi");
+    midiin = rtmidi_in_create_default();
+    if (midiin == NULL) {
+        printf("Failed initialising RtMidi!\n");
+        return 1;
+    }
 
-         // Don't ignore sysex, timing, or active sensing messages.
-        rtmidi_in_ignore_types(midiin, false, false, false);
-        // Install an interrupt handler function.
-        (void) signal(SIGINT, finish);
+    // Check available ports.
+    nPorts = rtmidi_get_port_count(midiin);
+    if (nPorts == 0) {
+        printf("No ports available!\n");
+        return 1;
+    }
+    rtmidi_get_port_name(midiin, 0, portName, &portNameLen);
+    rtmidi_open_port(midiin, 0, "RtMidi");
 
-        // Periodically check input queue.
-        printf("Reading MIDI from port %s quit with Ctrl-C.\n", portName);
-        while (midiin->ok) {
+    // Don't ignore sysex, timing, or active sensing messages.
+    rtmidi_in_ignore_types(midiin, false, false, false);
+    // Install an interrupt handler function.
+    (void) signal(SIGINT, finish);
+
+    // Periodically check input queue.
+    printf("Reading MIDI from port %s quit with Ctrl-C.\n", portName);
+    while (midiin->ok && !done) {
+        do {
+            nBytes = sizeof(messages);
             stamp = (float)rtmidi_in_get_message(midiin, messages, &nBytes);
 
-            for ( i=0; i<nBytes; i++ )
-                printf("Byte %d = %d, ", i, (int)messages[i]);
             if ( nBytes > 0 )
-                printf("stamp = %.2f\n", stamp);
+            {
+                unsigned char* readbuf = messages;
+                unsigned char status = *readbuf;
+                printf("in bytes %u, stamp = %.2f\n", (unsigned)nBytes, stamp);
 
-            SLEEP(10);
-        }
-        rtmidi_close_port(midiin);
+                if ((status & 0xf0) == MIDI_NOTE_ON) {
+                    unsigned channel  = status & 0x0f;
+                    unsigned note     = readbuf[1];
+                    unsigned velocity = readbuf[2];
+                    printf("note on! channel: %u, note: %u, velocity: %u\n", channel, note, velocity);
+                } else if ((status & 0xf0) == MIDI_NOTE_OFF) {
+                    unsigned channel  = status & 0x0f;
+                    unsigned note     = readbuf[1];
+                    unsigned velocity = readbuf[2];
+                    printf("note off... channel: %u, note: %u, velocity: %u\n", channel, note, velocity);
+                }
+            }
+        } while (nBytes != 0 && !done);
 
-    cleanup:
-        rtmidi_in_free(midiin);
+        SLEEP(10);
     }
- 
-  return 0;
+    rtmidi_close_port(midiin);
+
+    // OS cleans up automatically when process exits...
+    // rtmidi_in_free(midiin); 
+    return 0;
 }
