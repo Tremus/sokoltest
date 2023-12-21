@@ -4,21 +4,6 @@ project(sokoltest)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 99)
 
-# RtMidi examples
-add_executable(midiprobe src/rtmidi/midiprobe.cpp src/rtmidi/RtMidi.cpp)
-target_include_directories(midiprobe PRIVATE src/rtmidi/)
-add_executable(qmidiin src/rtmidi/qmidiin.c src/rtmidi/rtmidi_c.cpp src/rtmidi/RtMidi.cpp)
-target_include_directories(qmidiin PRIVATE src/rtmidi/)
-
-set(MIDI_LIBS "")
-if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND MIDI_LIBS "-lwinmm")
-elseif(APPLE)
-    list(APPEND MIDI_LIBS "-framework CoreMIDI -framework CoreAudio -framework CoreFoundation")
-endif()
-target_link_libraries(midiprobe PRIVATE ${MIDI_LIBS})
-target_link_libraries(qmidiin PRIVATE ${MIDI_LIBS})
-
 # Standalone apps
 set(PLATFORM_SOURCES "")
 if(APPLE)
@@ -66,8 +51,6 @@ create_app(sokolnuklear
         ${PLATFORM_SOURCES}
         src/thread.c
         src/nuklear/nuklear.c
-        src/rtmidi/rtmidi_c.cpp
-        src/rtmidi/RtMidi.cpp
 )
 
 # Debug cold build time: range 950-1050ms, median: 1s (MacBook Air M1)

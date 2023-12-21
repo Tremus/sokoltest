@@ -23,17 +23,18 @@
 #define SOKOL_NUKLEAR_IMPL
 #include "sokol_nuklear.h"
 #include "thread.h"
-#define INCLUDED_RINGBUF_IMPL
-#include "ringbuffer.h"
-// TODO: replace rtmidi
-#include "rtmidi/rtmidi_c.h"
+#define MINIMIDI_IMPL
+#define MINIMIDI_USE_GLOBAL
+#include "minimidi.h"
 
 #ifdef _WIN32
 // void Sleep(unsigned long ms);
 #define SLEEP(ms) Sleep(ms)
+#define print(str, ...) (printf(str, __VA_ARGS__), fflush(stdout))
 #else
 #include <unistd.h>
 #define SLEEP(ms) usleep(ms * 1000)
+#define print printf
 #endif
 
 #include <math.h>
@@ -41,7 +42,6 @@
 static int draw_demo_ui(struct nk_context* ctx);
 
 // Midi stuff
-ringbuf_t gMidiRingBuffer;
 thread_atomic_int_t gExitThreads;
 thread_ptr_t gMidiThread;
 
@@ -53,50 +53,69 @@ enum MidiEventType {
 // Midi thread...
 static int midi_cb(void* userdata)
 {
-    unsigned char messages[1024];
-    size_t nBytes;
-    struct RtMidiWrapper *midiin;
-    double stamp;
-    char portName[128];
-    unsigned int nPorts;
-    int portNameLen;
-    midiin = rtmidi_in_create_default();
+    MiniMIDI*    mm;
+    unsigned int numPorts;
+    char         portName[128];
+    int          err;
 
-    if (!midiin) {
-        printf("Failed to init RtMIDI! Exiting thread...\n");
+    mm  = minimidi_get_global();
+
+    if (!mm) {
+        print("Failed to init RtMIDI! Exiting thread...\n");
         return 1;
     }
 
     // Check available ports.
-    nPorts = rtmidi_get_port_count(midiin);
-    while (nPorts == 0) {
-        printf("No MIDI ports available! Sleeping for 1sec\n");
+    numPorts = minimidi_get_num_ports(mm);
+    while (numPorts == 0) {
+        print("No MIDI ports available! Please connect a device. Sleeping for 1sec\n");
         SLEEP(1000);
+
+        numPorts = minimidi_get_num_ports(mm);
     }
-    rtmidi_get_port_name(midiin, 0, portName, &portNameLen);
-    rtmidi_open_port(midiin, 0, "RtMidi");
+    err = minimidi_get_port_name(mm, 0, portName, sizeof(portName));
+    if (err != 0) {
+        print("Failed getting port name!\n");
+        return 1;
+    }
+    err = minimidi_connect_port(mm, 0, "sokol-nuklear-midi");
+    if (err != 0) {
+        print("Failed connecting to port 0!\n");
+        return 1;
+    }
 
     // Periodically check input queue.
-    printf("Reading MIDI from port %s.\n", portName);
-    while (midiin->ok) {
-        do {
-            nBytes = sizeof(messages);
-            stamp = rtmidi_in_get_message(midiin, messages, &nBytes);
-            // ignore timestamp. this is quick and dirty
-            ringbuf_memcpy_into(gMidiRingBuffer, messages, nBytes);
+    print("Reading MIDI from port %s.\n", portName);
+    while (thread_atomic_int_load(&gExitThreads) != 1) {
+#ifdef _WIN32
+        /* Hotplugging for windows. On MacOS it's automatic... */
+        if (minimidi_should_reconnect(mm)) {
+            static const int HOTPLUG_TIMEOUT        = (1000 * 60 * 2); /* 2min */
+            static const int HOTPLUG_SLEEP_INTERVAL = 100;             /* 100ms */
+            int              msCounter              = 0;
+
+            print("WARNING: Unknown device disconnected!\n");
+            print("If this was your MIDI device, please plug it back in. This program will automatically reconnect.\n");
+
+            while (msCounter < HOTPLUG_TIMEOUT && thread_atomic_int_load(&gExitThreads) != 1) {
+                if (minimidi_try_reconnect(mm, "sokol-nuklear-midi")) {
+                    print("Successfully reconnected!\n");
+                    break;
+                }
+
+                SLEEP(HOTPLUG_SLEEP_INTERVAL);
+                msCounter += HOTPLUG_SLEEP_INTERVAL;
+            }
         }
-        while (nBytes != 0 && midiin->ok);
+#endif
 
-        if (thread_atomic_int_load(&gExitThreads) == 1)
-            break;
-
-        SLEEP(10);
-        // thread_yield();
+        SLEEP(100);
     }
-    rtmidi_close_port(midiin);
+    print("Disconnecting from MIDI port\n");
+    minimidi_disconnect_port(mm);
 
     // OS will clear memory...
-    // rtmidi_in_free(midiin);
+    // rtmidi_in_free(mm);
     return 0;
 }
 
@@ -118,35 +137,25 @@ static void audio_cb(float* buffer, int num_frames, int num_channels) {
     if (thread_atomic_int_load(&gExitThreads) == 1)
         return;
 
-    // (poorly) process incoming MIDI
-    uint8_t *bufend = ringbuf_end(gMidiRingBuffer);
-    uint8_t *head = ringbuf_head(gMidiRingBuffer);
-    uint8_t *tail = ringbuf_tail(gMidiRingBuffer);
-    while (tail != head) {
-        uint8_t status = *tail;
-        if (++tail == bufend) tail = gMidiRingBuffer->buf;
-
-        if ((status & 0xf0) == MIDI_NOTE_ON) {
-            unsigned channel  = status & 0x0f;
-            unsigned midiNote = *tail;
-            if (++tail == bufend) tail = gMidiRingBuffer->buf;
-            unsigned velocity = *tail;
-            if (++tail == bufend) tail = gMidiRingBuffer->buf;
+    MiniMIDI* mm = minimidi_get_global();
+    MiniMIDIMessage msg = minimidi_read_message(mm);
+    while (msg.timestampMs != 0) {
+        if ((msg.status & 0xf0) == MIDI_NOTE_ON) {
+            uint8_t channel  = msg.status & 0x0f;
+            uint8_t midiNote = msg.data1;
+            uint8_t velocity = msg.data2;
             // ignore channel & velocity
             gCurrentMidiNote = midiNote;
-
-        } else if ((status & 0xf0) == MIDI_NOTE_OFF) {
-            uint8_t  channel = status & 0x0f;
-            uint8_t  midiNote = *tail;
-            if (++tail == bufend) tail = gMidiRingBuffer->buf;
-            uint8_t  velocity = *tail;
-            if (++tail == bufend) tail = gMidiRingBuffer->buf;
+        } else if ((msg.status & 0xf0) == MIDI_NOTE_OFF) {
+            uint8_t channel  = msg.status & 0x0f;
+            uint8_t midiNote = msg.data1;
+            uint8_t velocity = msg.data2;
             // ignore channel & velocity
             if (midiNote == gCurrentMidiNote)
                 gCurrentMidiNote = 0xff;
         }
+        msg = minimidi_read_message(mm);
     }
-    gMidiRingBuffer->tail = tail;
 
     // Check if playing 
     if (gCurrentMidiNote == 0xff || gAudioBypass == AUDIO_OFF)
@@ -172,7 +181,8 @@ static void audio_cb(float* buffer, int num_frames, int num_channels) {
 
 void init(void) {
     // init midi thread
-    gMidiRingBuffer = ringbuf_new(2048);
+    minimidi_get_global();
+    minimidi_init(minimidi_get_global());
     thread_atomic_int_store(&gExitThreads,  0);
     // start midi thread
     gMidiThread = thread_create(midi_cb, NULL, 0);
@@ -225,16 +235,15 @@ void frame(void) {
 
 void cleanup(void) {
     thread_atomic_int_store(&gExitThreads, 1);
+    saudio_shutdown();
     thread_join(gMidiThread);
 
-    saudio_shutdown();
     // __dbgui_shutdown();
     snk_shutdown();
     sg_shutdown();
 
     // The OS automatically frees memory when finishing process...
     // thread_destroy(gMidiThread);
-    // ringbuf_free(gMidiRingBuffer);
 }
 
 void input(const sapp_event* event) {
