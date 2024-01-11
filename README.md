@@ -22,6 +22,5 @@ Use CMake a select the `sokolnuklear` target
 
 ### Notes
 - Audio I/O is 1 output (mono), zero inputs. You can change this by adjusting the settings in **sokol_audio** 
-- The RtMidi C interface will allocate memory every time you ask for a new midi message (not very RT friendly). This is because they use `std::vector` from C++. At some point I may rewrite their C inerface to fix this...
 - The MIDI thread will automatically try to connect to the first available port (index: 0). If you have multiple MIDI input ports available, you may need to change this behaviour...
 - You will notice some Dear ImGUI code floating around the codebase. In the beginning I was comparing Dear ImGUI with Nuklear and decided against Dear ImGui due to more files, slightly longer build times, and increased binary size. If want to use this template and you prefer using Dear ImGUI, you'll have no problem copy/pasting the audio and MIDI code to the [main source file](src\cimgui-sapp.c)
