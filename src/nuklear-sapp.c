@@ -11,7 +11,6 @@
 #include "sokol_glue.h"
 #include "sokol_log.h"
 
-
 // include nuklear.h before the sokol_nuklear.h implementation
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
@@ -154,6 +153,12 @@ static float gCrossover = 0.5f;
 static uint8_t      gCurrentMidiNote = 0xff;
 static inline float gain_to_db(float g) { return log10f(g) * 20; }
 static inline float db_to_gain(float db) { return pow(10, db / 20); }
+static inline float norm_to_hz(float norm) { return 20 * exp2f(norm * 10); }
+
+static float stage1_ic1eq = 0;
+static float stage1_ic2eq = 0;
+static float stage2_ic1eq = 0;
+static float stage2_ic2eq = 0;
 
 // Audio thread...
 static void audio_cb(float* buffer, int num_frames, int num_channels)
@@ -208,6 +213,49 @@ static void audio_cb(float* buffer, int num_frames, int num_channels)
         phase     -= (int)phase;
     }
     gPhase = phase;
+
+    // Crossover
+    static float pi         = 3.141592653589793;
+    static float inv_sqrt_2 = 0.7071067811865475f; // butterworth
+    float        cutoff     = norm_to_hz(gCrossover);
+
+    float g  = tanf(pi * cutoff / saudio_sample_rate());
+    float k  = 2 * inv_sqrt_2;
+    float a0 = 1.0f / ((1 + g) * (1 + g) - g * k);
+    float a1 = k * a0;
+    float a2 = (1 + g) * a0;
+    float a3 = g * a2;
+    float a4 = 1 / (1 + g);
+    float a5 = g * a4;
+
+    float ic1eq = stage1_ic1eq;
+    float ic2eq = stage1_ic2eq;
+    float ic3eq = stage2_ic1eq;
+    float ic4eq = stage2_ic2eq;
+    for (int i = 0; i < num_frames; i++)
+    {
+        float v0 = buffer[i];
+        float v1 = a1 * ic2eq + a2 * ic1eq + a3 * v0;
+        float v2 = a4 * ic2eq + a5 * v1;
+
+        float v3 = a1 * ic2eq + a2 * ic1eq + a3 * v2;
+        float v4 = a4 * ic2eq + a5 * v1;
+
+        ic1eq = 2 * (v1 - k * v2) - ic1eq;
+        ic2eq = 2 * v2 - ic2eq;
+
+        ic3eq = 2 * (v3 - k * v4) - ic3eq;
+        ic4eq = 2 * v4 - ic4eq;
+
+        float low  = v4;
+        float high = v0 - v4;
+
+        buffer[i] = low + high;
+    }
+    stage1_ic1eq = ic1eq;
+    stage1_ic2eq = ic2eq;
+    stage2_ic1eq = ic3eq;
+    stage2_ic2eq = ic4eq;
 }
 
 // App stuff
@@ -323,6 +371,21 @@ static int draw_demo_ui(struct nk_context* ctx)
 
             char text[16];
             snprintf(text, sizeof(text), "%.2fdB", gGaindB);
+            nk_layout_row_push(ctx, 70);
+            nk_label(ctx, text, NK_TEXT_LEFT);
+        }
+        nk_layout_row_end(ctx);
+
+        nk_layout_row_begin(ctx, NK_STATIC, 30, 3);
+        {
+            nk_layout_row_push(ctx, 70);
+            nk_label(ctx, "Cross:", NK_TEXT_LEFT);
+            nk_layout_row_push(ctx, 200);
+            nk_slider_float(ctx, 0, &gCrossover, 1.0f, 0.00000001f);
+
+            char  text[16];
+            float Hz = norm_to_hz(gCrossover);
+            snprintf(text, sizeof(text), "%.2fHz", Hz);
             nk_layout_row_push(ctx, 70);
             nk_label(ctx, text, NK_TEXT_LEFT);
         }
